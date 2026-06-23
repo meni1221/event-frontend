@@ -64,6 +64,8 @@ export const he = {
   casual: 'קליל',
   authTitle: 'התחברות למערכת',
   authSubtitle: 'היכנס כדי לנהל אירועים, הזמנות ו-WhatsApp',
+  signInWithGoogle: 'המשך עם Google',
+  googleSignInFailed: 'התחברות עם Google נכשלה',
   email: 'אימייל',
   password: 'סיסמה',
   forgotPassword: 'שכחתי סיסמה',

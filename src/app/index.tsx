@@ -1,6 +1,6 @@
-import { DirectionProvider, MantineProvider, createTheme } from '@mantine/core';
+import { Card, Center, DirectionProvider, MantineProvider, Stack, Text, createTheme } from '@mantine/core';
 import { useEffect, useState } from 'react';
-import { getPublicInvite, PublicInvite, SESSION_EXPIRED_EVENT } from '../api';
+import { getPublicInvite, PublicInvite, readGoogleAuthCallback, SESSION_EXPIRED_EVENT } from '../api';
 import { FeedbackProvider } from '../components/feedback';
 import { AppProvider, useAppContext } from '../context/app';
 import { getDefaultInvitationText } from '../data';
@@ -67,9 +67,12 @@ const AppContent = () => {
   const [publicInviteError, setPublicInviteError] = useState<string | null>(null);
   const [publicInviteLoading, setPublicInviteLoading] = useState(false);
   const inviteRoute = getInviteRoute(window.location.pathname);
+  const isGoogleAuthCallback = window.location.pathname === '/auth/google/callback';
   const resetToken = window.location.pathname === '/reset-password'
     ? new URLSearchParams(window.location.search).get('token') ?? ''
     : '';
+  const [googleAuthMessage, setGoogleAuthMessage] = useState<string | null>(null);
+  const [googleAuthError, setGoogleAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     document.documentElement.dir = dir;
@@ -101,11 +104,41 @@ const AppContent = () => {
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, logout);
   }, [logout]);
 
+  useEffect(() => {
+    if (!isGoogleAuthCallback || googleAuthMessage || googleAuthError) {
+      return;
+    }
+
+    try {
+      const result = readGoogleAuthCallback();
+      if ('pendingApproval' in result) {
+        setGoogleAuthMessage(labels.pendingApprovalMessage);
+        window.history.replaceState({}, '', '/auth/google/callback');
+        return;
+      }
+
+      window.history.replaceState({}, '', '/dashboard/events');
+      dashboardState.handleAuthenticated(result);
+    } catch (cause) {
+      setGoogleAuthError(getFriendlyErrorMessage(cause, labels));
+      window.history.replaceState({}, '', '/');
+    }
+  }, [dashboardState, googleAuthError, googleAuthMessage, isGoogleAuthCallback, labels]);
+
   return (
     <DirectionProvider key={dir} initialDirection={dir} detectDirection={false}>
       <MantineProvider defaultColorScheme="light" theme={theme}>
         <FeedbackProvider>
-          {resetToken ? (
+          {isGoogleAuthCallback && (googleAuthMessage || googleAuthError) ? (
+            <Center className="authSurface" mih="100vh" p="md">
+              <Card className="authCard" withBorder radius="sm" p="xl" w="min(100%, 460px)">
+                <Stack gap="sm">
+                  <Text fw={900}>{googleAuthError ? labels.googleSignInFailed : labels.pendingApproval}</Text>
+                  <Text c={googleAuthError ? 'red' : 'dimmed'}>{googleAuthError ?? googleAuthMessage}</Text>
+                </Stack>
+              </Card>
+            </Center>
+          ) : resetToken ? (
             <ResetPasswordPanel labels={labels} token={resetToken} onAuthenticated={dashboardState.handleAuthenticated} />
           ) : inviteRoute?.inviteId ? (
             <GuestPanel

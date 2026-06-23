@@ -257,6 +257,33 @@ export const resetPassword = async (token: string, password: string): Promise<Au
     body: JSON.stringify({ password, token }),
   });
 
+export const startGoogleAuth = async (): Promise<{ authUrl: string }> =>
+  request('/auth/google');
+
+export const readGoogleAuthCallback = (): AuthResponse => {
+  const query = new URLSearchParams(window.location.search);
+  const callbackError = query.get('error');
+  if (callbackError) {
+    throw new Error(callbackError);
+  }
+
+  const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+  const params = new URLSearchParams(hash);
+  const encodedPayload = params.get('payload');
+  if (!encodedPayload) {
+    throw new Error('Missing Google sign-in payload');
+  }
+
+  const base64 = encodedPayload.replace(/-/g, '+').replace(/_/g, '/');
+  const paddedBase64 = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+  const result = JSON.parse(window.atob(paddedBase64)) as AuthResponse;
+  if ('accessToken' in result) {
+    setApiSession(result);
+  }
+
+  return result;
+};
+
 export const changeCurrentPassword = async (currentPassword: string, newPassword: string): Promise<{ ok: boolean }> =>
   request('/admin/me/password', {
     method: 'PATCH',

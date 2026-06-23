@@ -64,6 +64,8 @@ export const en = {
   casual: 'Casual',
   authTitle: 'Sign in',
   authSubtitle: 'Manage events, invitations, and WhatsApp',
+  signInWithGoogle: 'Continue with Google',
+  googleSignInFailed: 'Google sign-in failed',
   email: 'Email',
   password: 'Password',
   forgotPassword: 'Forgot password',

@@ -1,7 +1,7 @@
 import { Box, Button, Card, Center, Group, PasswordInput, SegmentedControl, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { useState } from 'react';
-import { IconLock, IconMail } from '@tabler/icons-react';
-import { AuthSession, forgotPassword, login, register, resetPassword } from '../../api';
+import { IconBrandGoogle, IconLock, IconMail } from '@tabler/icons-react';
+import { AuthSession, forgotPassword, login, register, resetPassword, startGoogleAuth } from '../../api';
 import { BrandLogo } from '../../components/brand-logo';
 import { useFeedback } from '../../components/feedback';
 import { PasswordStrengthMeter } from '../../components/password-strength-meter';
@@ -27,6 +27,7 @@ export const AuthPanel = ({ labels, onAuthenticated }: AuthPanelProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const passwordStrength = getPasswordStrength(password);
@@ -79,6 +80,24 @@ export const AuthPanel = ({ labels, onAuthenticated }: AuthPanelProps) => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    setGoogleLoading(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const { authUrl } = await startGoogleAuth();
+      window.location.href = authUrl;
+    } catch (cause) {
+      const message = getFriendlyErrorMessage(cause, labels);
+      appLogger.warn('auth.google.start_failed', 'Google sign-in failed to start', { message });
+      setError(message);
+      showFeedback({ type: 'error', title: labels.googleSignInFailed, message });
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -149,6 +168,15 @@ export const AuthPanel = ({ labels, onAuthenticated }: AuthPanelProps) => {
 
           <Button loading={loading} disabled={mode === 'register' && !passwordStrength.isStrong} onClick={submit}>
             {mode === 'login' ? labels.login : labels.register}
+          </Button>
+
+          <Button
+            variant="light"
+            loading={googleLoading}
+            leftSection={<IconBrandGoogle size={uiConfig.icons.button} />}
+            onClick={signInWithGoogle}
+          >
+            {labels.signInWithGoogle}
           </Button>
 
           {mode === 'login' && (
