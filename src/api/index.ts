@@ -284,11 +284,15 @@ export const readGoogleAuthCallback = (): AuthResponse => {
   return result;
 };
 
-export const changeCurrentPassword = async (currentPassword: string, newPassword: string): Promise<{ ok: boolean }> =>
-  request('/admin/me/password', {
+export const changeCurrentPassword = async (currentPassword: string, newPassword: string): Promise<{ ok: boolean }> => {
+  const result = await request<{ ok: boolean }>('/admin/me/password', {
     method: 'PATCH',
     body: JSON.stringify({ currentPassword, newPassword }),
   });
+
+  expireSession();
+  return result;
+};
 
 export const connectWhatsapp = async (): Promise<WhatsappSnapshot> =>
   request('/whatsapp/connect', {
@@ -537,10 +541,6 @@ export const submitPublicRsvp = async (
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      expireSession();
-    }
-
     throw new Error(await response.text());
   }
 
@@ -650,6 +650,10 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 
   if (!response.ok) {
     appLogger.request(method, path, 'failed', response.status);
+    if (response.status === 401 && activeSession) {
+      expireSession();
+    }
+
     throw new Error(await response.text());
   }
 
