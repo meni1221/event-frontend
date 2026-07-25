@@ -73,6 +73,7 @@ const AppContent = () => {
     : '';
   const [googleAuthMessage, setGoogleAuthMessage] = useState<string | null>(null);
   const [googleAuthError, setGoogleAuthError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
     document.documentElement.dir = dir;
@@ -100,8 +101,13 @@ const AppContent = () => {
   }, [inviteRoute?.eventId, inviteRoute?.inviteId, labels]);
 
   useEffect(() => {
-    window.addEventListener(SESSION_EXPIRED_EVENT, logout);
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, logout);
+    const handleSessionExpired = () => {
+      setSessionExpired(true);
+      logout();
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
   }, [logout]);
 
   useEffect(() => {
@@ -153,7 +159,14 @@ const AppContent = () => {
               publicEventId={inviteRoute.eventId}
             />
           ) : !dashboardState.session ? (
-            <AuthPanel labels={labels} onAuthenticated={dashboardState.handleAuthenticated} />
+            <AuthPanel
+              labels={labels}
+              onAuthenticated={(session) => {
+                setSessionExpired(false);
+                dashboardState.handleAuthenticated(session);
+              }}
+              sessionExpired={sessionExpired}
+            />
           ) : (
             <Dashboard
               activeTab={activeTab}

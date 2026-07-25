@@ -1,4 +1,4 @@
-import { Box, Button, Card, Center, Group, PasswordInput, SegmentedControl, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
+import { Alert, Box, Button, Card, Center, Group, PasswordInput, SegmentedControl, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { useState } from 'react';
 import { IconBrandGoogle, IconLock, IconMail } from '@tabler/icons-react';
 import { AuthSession, forgotPassword, login, register, resetPassword, startGoogleAuth } from '../../api';
@@ -16,11 +16,12 @@ import { validateEmail } from '../../utils/validation';
 type AuthPanelProps = {
   labels: Record<string, string>;
   onAuthenticated: (session: AuthSession) => void;
+  sessionExpired?: boolean;
 };
 
 type AuthMode = 'login' | 'register';
 
-export const AuthPanel = ({ labels, onAuthenticated }: AuthPanelProps) => {
+export const AuthPanel = ({ labels, onAuthenticated, sessionExpired = false }: AuthPanelProps) => {
   useComponentLogger('AuthPanel');
   const { showFeedback } = useFeedback();
   const [mode, setMode] = useState<AuthMode>('login');
@@ -130,6 +131,12 @@ export const AuthPanel = ({ labels, onAuthenticated }: AuthPanelProps) => {
             <Text size="sm" c="dimmed">{labels.authSubtitle}</Text>
           </Stack>
 
+          {sessionExpired && (
+            <Alert color="yellow" role="alert" title={labels.sessionExpired}>
+              {labels.sessionExpiredHint}
+            </Alert>
+          )}
+
           <SegmentedControl
             value={mode}
             onChange={(value) => {
@@ -163,8 +170,8 @@ export const AuthPanel = ({ labels, onAuthenticated }: AuthPanelProps) => {
 
           {mode === 'register' && <PasswordStrengthMeter labels={labels} password={password} />}
 
-          {error && <Text c="red" size="sm">{error}</Text>}
-          {notice && <Text c="ishruGreen.8" size="sm" fw={700}>{notice}</Text>}
+          {error && <Text c="red" role="alert" size="sm">{error}</Text>}
+          {notice && <Text c="ishruGreen.8" role="status" size="sm" fw={700}>{notice}</Text>}
 
           <Button loading={loading} disabled={mode === 'register' && !passwordStrength.isStrong} onClick={submit}>
             {mode === 'login' ? labels.login : labels.register}
