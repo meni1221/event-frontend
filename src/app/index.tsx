@@ -2,6 +2,7 @@ import { Card, Center, DirectionProvider, MantineProvider, Stack, Text, createTh
 import { useEffect, useState } from 'react';
 import { getPublicInvite, PublicInvite, readGoogleAuthCallback, SESSION_EXPIRED_EVENT } from '../api';
 import { FeedbackProvider } from '../components/feedback';
+import { AppErrorBoundary } from '../components/app-error-boundary';
 import { AppProvider, useAppContext } from '../context/app';
 import { getDefaultInvitationText } from '../data';
 import { AuthPanel, ResetPasswordPanel } from '../pages/auth';
@@ -185,7 +186,9 @@ const AppContent = () => {
 };
 
 export const App = () => (
-  <AppProvider>
-    <AppContent />
-  </AppProvider>
+  <AppErrorBoundary>
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
+  </AppErrorBoundary>
 );
