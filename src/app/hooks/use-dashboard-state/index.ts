@@ -7,11 +7,13 @@ import {
   getEvents,
   getCurrentProfile,
   getGuests,
+  getSeatingTables,
   getStoredSession,
   setApiSession,
   updateCurrentOnboarding,
   updateEvent as updateEventRequest,
   updateGuest as updateGuestRequest,
+  updateSeatingTables,
 } from '../../../api';
 import { EventCard, EventTheme, getDefaultInvitationText, GuestRecord, sampleEvents, sampleGuests, sampleSeatingTables, SeatingTable, TemplateKey } from '../../../data';
 import { appLogger } from '../../../utils/logger';
@@ -56,10 +58,13 @@ export const useDashboardState = () => {
     }
 
     try {
-      const hostEvents = await getEvents();
-      const hostGuests = await getGuests();
+      const [hostEvents, hostGuests] = await Promise.all([getEvents(), getGuests()]);
+      const hostSeatingTables = (await Promise.all(
+        hostEvents.map((event) => getSeatingTables(event.id)),
+      )).flat();
       setEvents(applyGuestTotals(hostEvents, hostGuests));
       setGuests(hostGuests);
+      setSeatingTables(hostSeatingTables);
       setSelectedEventId(hostEvents[0]?.id ?? '');
       setInvitationTitle(hostEvents[0]?.eventName ?? '');
       appLogger.info('dashboard.events.loaded', 'Loaded host data from backend', { events: hostEvents.length, guests: hostGuests.length });
@@ -118,8 +123,20 @@ export const useDashboardState = () => {
     }
   };
 
-  const createSeatingTable = (table: SeatingTable) => {
-    setSeatingTables((currentTables) => [table, ...currentTables]);
+  const persistSeatingTables = async (eventId: string, eventTables: SeatingTable[]) => {
+    const savedTables = !session || isDemoSession(session)
+      ? eventTables
+      : await updateSeatingTables(eventId, eventTables);
+
+    setSeatingTables((currentTables) => [
+      ...currentTables.filter((table) => table.eventId !== eventId),
+      ...savedTables,
+    ]);
+  };
+
+  const createSeatingTable = async (table: SeatingTable) => {
+    const eventTables = seatingTables.filter((currentTable) => currentTable.eventId === table.eventId);
+    await persistSeatingTables(table.eventId, [table, ...eventTables]);
   };
 
   const createGuest = async (guest: GuestRecord) => {
@@ -222,25 +239,49 @@ export const useDashboardState = () => {
     appLogger.info('dashboard.invitation.saved', 'Invitation draft saved', { eventId: selectedEventId });
   };
 
-  const assignGuestToTable = (guestId: string, tableId: string) => {
-    setSeatingTables((currentTables) =>
-      currentTables.map((table) => ({
+  const assignGuestToTable = async (guestId: string, tableId: string) => {
+    const targetTable = seatingTables.find((table) => table.id === tableId);
+    if (!targetTable) {
+      return;
+    }
+
+    const eventTables = seatingTables
+      .filter((table) => table.eventId === targetTable.eventId)
+      .map((table) => ({
         ...table,
         guestIds:
           table.id === tableId
             ? Array.from(new Set([...table.guestIds, guestId]))
             : table.guestIds.filter((currentGuestId) => currentGuestId !== guestId),
-      })),
-    );
+      }));
+    await persistSeatingTables(targetTable.eventId, eventTables);
   };
 
-  const removeGuestFromTable = (guestId: string) => {
-    setSeatingTables((currentTables) =>
-      currentTables.map((table) => ({
+  const removeGuestFromTable = async (guestId: string) => {
+    const targetTable = seatingTables.find((table) => table.guestIds.includes(guestId));
+    if (!targetTable) {
+      return;
+    }
+
+    const eventTables = seatingTables
+      .filter((table) => table.eventId === targetTable.eventId)
+      .map((table) => ({
         ...table,
         guestIds: table.guestIds.filter((currentGuestId) => currentGuestId !== guestId),
-      })),
+      }));
+    await persistSeatingTables(targetTable.eventId, eventTables);
+  };
+
+  const deleteSeatingTable = async (tableId: string) => {
+    const targetTable = seatingTables.find((table) => table.id === tableId);
+    if (!targetTable) {
+      return;
+    }
+
+    const eventTables = seatingTables.filter(
+      (table) => table.eventId === targetTable.eventId && table.id !== tableId,
     );
+    await persistSeatingTables(targetTable.eventId, eventTables);
   };
 
   const handleAuthenticated = (nextSession: AuthSession) => {
@@ -357,6 +398,7 @@ export const useDashboardState = () => {
     createEvent,
     createGuest,
     deleteGuest,
+    deleteSeatingTable,
     updateGuest,
     createSeatingTable,
     assignGuestToTable,
