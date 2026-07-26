@@ -21,8 +21,10 @@ vi.mock('../../api', () => ({
   suspendAdmin: apiMocks.suspendAdmin,
 }));
 
-const labels = new Proxy<Record<string, string>>({}, {
-  get: (_target, property) => String(property),
+const labels = new Proxy<Record<string, string>>({
+  suspendAdminConfirmation: 'Suspend {email}',
+}, {
+  get: (target, property) => target[String(property)] ?? String(property),
 });
 
 const createUser = (overrides: Partial<OwnerUser>): OwnerUser => ({
