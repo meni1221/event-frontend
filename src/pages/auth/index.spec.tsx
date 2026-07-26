@@ -21,6 +21,11 @@ const renderAuthPanel = (sessionExpired = false) => render(
 );
 
 beforeAll(() => {
+  vi.stubGlobal('ResizeObserver', class ResizeObserverMock {
+    disconnect() {}
+    observe() {}
+    unobserve() {}
+  });
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     value: vi.fn().mockImplementation(() => ({
