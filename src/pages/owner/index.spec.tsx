@@ -64,7 +64,7 @@ describe('OwnerPanel account lifecycle', () => {
     expect(within(ownerRow as HTMLElement).queryByRole('button', { name: 'suspendAdmin' })).not.toBeInTheDocument();
 
     fireEvent.click(within(hostRow as HTMLElement).getByRole('button', { name: 'suspendAdmin' }));
-    const dialog = screen.getByRole('dialog', { name: 'suspendAdminTitle' });
+    const dialog = await screen.findByRole('dialog', { name: 'suspendAdminTitle' });
     expect(dialog).toHaveTextContent('host@example.com');
     expect(apiMocks.suspendAdmin).not.toHaveBeenCalled();
 
