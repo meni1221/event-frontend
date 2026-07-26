@@ -3,7 +3,7 @@
 import '@testing-library/jest-dom/vitest';
 import { MantineProvider } from '@mantine/core';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OwnerUser } from '../../api';
 import { FeedbackProvider } from '../../components/feedback';
 import { OwnerPanel } from '.';
@@ -41,17 +41,6 @@ const renderOwnerPanel = () => render(
     </FeedbackProvider>
   </MantineProvider>,
 );
-
-beforeAll(() => {
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    value: vi.fn().mockImplementation(() => ({
-      addEventListener: vi.fn(),
-      matches: false,
-      removeEventListener: vi.fn(),
-    })),
-  });
-});
 
 beforeEach(() => {
   vi.clearAllMocks();
