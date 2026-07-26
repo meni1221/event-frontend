@@ -174,7 +174,7 @@ export const useDashboardState = () => {
       const nextGuests = guests.filter((guest) => guest.id !== guestId);
       setGuests(nextGuests);
       setEvents((currentEvents) => applyGuestTotals(currentEvents, nextGuests));
-      removeGuestFromTable(guestId);
+      await removeGuestFromTable(guestId);
       return;
     }
 
@@ -183,7 +183,7 @@ export const useDashboardState = () => {
       const nextGuests = guests.filter((guest) => guest.id !== guestId);
       setGuests(nextGuests);
       setEvents((currentEvents) => applyGuestTotals(currentEvents, nextGuests));
-      removeGuestFromTable(guestId);
+      await removeGuestFromTable(guestId);
     } catch (cause) {
       appLogger.warn('dashboard.guest.delete_failed', 'Failed deleting guest in backend', {
         eventId: targetGuest?.eventId,
