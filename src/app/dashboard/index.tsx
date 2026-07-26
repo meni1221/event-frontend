@@ -293,6 +293,7 @@ const DashboardContent = ({
           selectedEvent={state.selectedEvent}
           onAssignGuest={state.assignGuestToTable}
           onCreateTable={state.createSeatingTable}
+          onDeleteTable={state.deleteSeatingTable}
           onRemoveGuest={state.removeGuestFromTable}
         />
       </Tabs.Panel>

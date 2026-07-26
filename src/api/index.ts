@@ -1,4 +1,4 @@
-import { EventCard, EventSeatingMode, EventTheme, GuestLanguage, GuestRecord, GuestStatus, InvitationDesignKey } from '../data';
+import { EventCard, EventSeatingMode, EventTheme, GuestLanguage, GuestRecord, GuestStatus, InvitationDesignKey, SeatingTable } from '../data';
 import { appLogger } from '../utils/logger';
 
 export type WhatsappStatus = 'DISCONNECTED' | 'QR_READY' | 'CONNECTED';
@@ -176,6 +176,10 @@ type BackendGuest = {
   };
 };
 
+type BackendSeatingTable = Omit<SeatingTable, 'eventId' | 'guestIds'> & {
+  guestIds: Array<{ _id?: string; toString?: () => string } | string>;
+};
+
 export type PublicInvite = {
   event: EventCard;
   guest: GuestRecord;
@@ -350,6 +354,21 @@ export const updateEvent = async (
   });
 
   return mapEvent(updatedEvent);
+};
+
+export const getSeatingTables = async (eventId: string): Promise<SeatingTable[]> => {
+  const response = await request<{ tables: BackendSeatingTable[] }>(`/events/${eventId}/seating`);
+  return response.tables.map((table) => mapSeatingTable(table, eventId));
+};
+
+export const updateSeatingTables = async (eventId: string, tables: SeatingTable[]): Promise<SeatingTable[]> => {
+  const response = await request<{ tables: BackendSeatingTable[] }>(`/events/${eventId}/seating`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      tables: tables.map(({ id, name, zone, capacity, guestIds }) => ({ id, name, zone, capacity, guestIds })),
+    }),
+  });
+  return response.tables.map((table) => mapSeatingTable(table, eventId));
 };
 
 export const getGuests = async (): Promise<GuestRecord[]> => {
@@ -624,6 +643,12 @@ const mapGuest = (guest: BackendGuest, eventId: string): GuestRecord => ({
   adults: guest.rsvpDetails?.adults ?? 0,
   children: guest.rsvpDetails?.children ?? 0,
   notes: guest.rsvpDetails?.notes,
+});
+
+const mapSeatingTable = (table: BackendSeatingTable, eventId: string): SeatingTable => ({
+  ...table,
+  eventId,
+  guestIds: table.guestIds.map(normalizeMongoId),
 });
 
 const normalizeMongoId = (value: { _id?: string; toString?: () => string } | string) => {
