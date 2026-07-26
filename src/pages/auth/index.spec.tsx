@@ -26,6 +26,10 @@ beforeAll(() => {
     observe() {}
     unobserve() {}
   });
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: vi.fn(() => null),
+  });
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     value: vi.fn().mockImplementation(() => ({
@@ -45,8 +49,8 @@ describe('AuthPanel accessibility', () => {
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'authTitle' })).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: 'authTitle' })).toBeInTheDocument();
-    expect(screen.getByLabelText('email')).toBeRequired();
-    expect(screen.getByLabelText('password')).toBeRequired();
+    expect(screen.getByLabelText(/^email/)).toBeRequired();
+    expect(screen.getByLabelText(/^password/)).toBeRequired();
     expect(screen.getByRole('button', { name: 'signInWithGoogle' })).toBeEnabled();
   });
 
@@ -56,7 +60,7 @@ describe('AuthPanel accessibility', () => {
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('sessionExpired');
     expect(alert).toHaveTextContent('sessionExpiredHint');
-    expect(screen.getByLabelText('email')).toBeEnabled();
+    expect(screen.getByLabelText(/^email/)).toBeEnabled();
   });
 
   it('has no automatically detectable accessibility violations', async () => {
