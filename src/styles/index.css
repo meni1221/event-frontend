@@ -386,6 +386,11 @@ body {
   transform: translateY(-2px);
 }
 
+.seatingTable:focus-visible {
+  outline: 3px solid rgba(53, 209, 139, 0.46);
+  outline-offset: 3px;
+}
+
 .seatingTable.selected {
   border-color: rgba(53, 209, 139, 0.52) !important;
   box-shadow: 0 18px 42px rgba(53, 209, 139, 0.16);

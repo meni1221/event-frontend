@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Group, NumberInput, Progress, SegmentedControl, Select, SimpleGrid, Stack, Table, Text, TextInput, Title } from '@mantine/core';
+import { Alert, Badge, Button, Card, Group, NumberInput, Progress, SegmentedControl, Select, SimpleGrid, Stack, Table, Text, TextInput, Title } from '@mantine/core';
 import { useMemo, useState } from 'react';
 import { ReactNode } from 'react';
 import { IconArmchair, IconDownload, IconPlus, IconUserPlus, IconUsersGroup, IconX } from '@tabler/icons-react';
@@ -12,9 +12,10 @@ type SeatingPanelProps = {
   labels: Record<string, string>;
   seatingTables: SeatingTable[];
   selectedEvent: EventCard | undefined;
-  onAssignGuest: (guestId: string, tableId: string) => void;
-  onCreateTable: (table: SeatingTable) => void;
-  onRemoveGuest: (guestId: string) => void;
+  onAssignGuest: (guestId: string, tableId: string) => Promise<void>;
+  onCreateTable: (table: SeatingTable) => Promise<void>;
+  onDeleteTable: (tableId: string) => Promise<void>;
+  onRemoveGuest: (guestId: string) => Promise<void>;
 };
 
 type TableMetric = SeatingTable & {
@@ -25,10 +26,13 @@ type TableMetric = SeatingTable & {
 
 type SeatingViewMode = 'tables' | 'gender';
 
-const getPartySize = (guest: GuestRecord) => {
+export const getPartySize = (guest: GuestRecord) => {
   const total = guest.adults + guest.children;
   return total > 0 ? total : 1;
 };
+
+export const canGuestFitTable = (guest: GuestRecord, table: Pick<TableMetric, 'seatsLeft'>) =>
+  table.seatsLeft >= getPartySize(guest);
 
 const getGenderSplitText = (guest: GuestRecord, labels: Record<string, string>) => {
   if (!guest.menCount && !guest.womenCount) {
@@ -45,6 +49,7 @@ export const SeatingPanel = ({
   selectedEvent,
   onAssignGuest,
   onCreateTable,
+  onDeleteTable,
   onRemoveGuest,
 }: SeatingPanelProps) => {
   useComponentLogger('SeatingPanel', { selectedEventId: selectedEvent?.id, tables: seatingTables.length, guests: guests.length });
@@ -57,6 +62,8 @@ export const SeatingPanel = ({
   const [tableZone, setTableZone] = useState('');
   const [tableCapacity, setTableCapacity] = useState<number | string>(10);
   const [viewMode, setViewMode] = useState<SeatingViewMode>('tables');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const eventGuests = useMemo(
     () => guests.filter((guest) => guest.eventId === selectedEvent?.id && guest.status !== 'declined'),
@@ -90,18 +97,31 @@ export const SeatingPanel = ({
   const totalMen = eventGuests.reduce((sum, guest) => sum + (guest.menCount || 0), 0);
   const totalWomen = eventGuests.reduce((sum, guest) => sum + (guest.womenCount || 0), 0);
 
-  const tableOptions = tableMetrics.map((table) => ({
-    value: table.id,
-    label: `${table.name} (${Math.max(table.seatsLeft, 0)} ${labels.seatsLeft})`,
-  }));
+  const runMutation = async (mutation: () => Promise<void>) => {
+    if (isSaving) {
+      return false;
+    }
 
-  const handleCreateTable = () => {
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      await mutation();
+      return true;
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : labels.seatingSaveError);
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCreateTable = async () => {
     if (!selectedEvent || !tableName.trim()) {
       return;
     }
 
     const table: SeatingTable = {
-      id: `table_${Date.now()}`,
+      id: `table_${crypto.randomUUID().replace(/-/g, '')}`,
       eventId: selectedEvent.id,
       name: tableName.trim(),
       zone: tableZone.trim() || labels.generalZone,
@@ -109,7 +129,10 @@ export const SeatingPanel = ({
       guestIds: [],
     };
 
-    onCreateTable(table);
+    const saved = await runMutation(() => onCreateTable(table));
+    if (!saved) {
+      return;
+    }
     setSelectedTableId(table.id);
     setTableName('');
     setTableZone('');
@@ -180,6 +203,12 @@ export const SeatingPanel = ({
         <SeatingMetric label={labels.seatedGuests} value={totalSeated} />
       </SimpleGrid>
 
+      {saveError && (
+        <Alert color="red" title={labels.seatingSaveError} role="alert" withCloseButton onClose={() => setSaveError('')}>
+          {saveError}
+        </Alert>
+      )}
+
       <SegmentedControl
         value={viewMode}
         onChange={(value) => setViewMode(value as SeatingViewMode)}
@@ -203,7 +232,7 @@ export const SeatingPanel = ({
             <Stack gap="sm">
               <Group gap="xs">
                 <IconPlus size={uiConfig.icons.alert} />
-                <Title order={4}>{labels.addTable}</Title>
+                <Title order={3}>{labels.addTable}</Title>
               </Group>
               <TextInput
                 label={labels.tableName}
@@ -218,7 +247,7 @@ export const SeatingPanel = ({
                 required
               />
               <NumberInput label={labels.capacity} min={1} value={tableCapacity} onChange={setTableCapacity} required />
-              <Button leftSection={<IconPlus size={uiConfig.icons.button} />} onClick={handleCreateTable}>
+              <Button loading={isSaving} leftSection={<IconPlus size={uiConfig.icons.button} />} onClick={handleCreateTable}>
                 {labels.createTable}
               </Button>
             </Stack>
@@ -242,7 +271,20 @@ export const SeatingPanel = ({
                 <Title order={3}>{selectedTable?.name ?? labels.chooseTable}</Title>
                 <Text size="sm" c="dimmed">{selectedTable?.zone}</Text>
               </Stack>
-              <Badge variant="light">{selectedTable?.seatedCount ?? 0}/{selectedTable?.capacity ?? 0}</Badge>
+              <Group gap="xs">
+                <Badge variant="light">{selectedTable?.seatedCount ?? 0}/{selectedTable?.capacity ?? 0}</Badge>
+                {selectedTable && (
+                  <Button
+                    size="xs"
+                    variant="light"
+                    color="red"
+                    disabled={isSaving}
+                    onClick={() => void runMutation(() => onDeleteTable(selectedTable.id))}
+                  >
+                    {labels.deleteTable}
+                  </Button>
+                )}
+              </Group>
             </Group>
 
             {selectedTable?.guests.length ? (
@@ -252,7 +294,7 @@ export const SeatingPanel = ({
                   guest={guest}
                   labels={labels}
                   action={
-                    <Button size="xs" variant="subtle" color="red" leftSection={<IconX size={uiConfig.icons.smallButton} />} onClick={() => onRemoveGuest(guest.id)}>
+                    <Button size="xs" variant="subtle" color="red" disabled={isSaving} leftSection={<IconX size={uiConfig.icons.smallButton} />} onClick={() => void runMutation(() => onRemoveGuest(guest.id))}>
                       {labels.remove}
                     </Button>
                   }
@@ -281,9 +323,14 @@ export const SeatingPanel = ({
                     <Select
                       size="xs"
                       w={180}
-                      placeholder={labels.assignToTable}
-                      data={tableOptions}
-                      onChange={(tableId) => tableId && onAssignGuest(guest.id, tableId)}
+                      placeholder={tableMetrics.some((table) => canGuestFitTable(guest, table)) ? labels.assignToTable : labels.noTableCapacity}
+                      data={tableMetrics.filter((table) => canGuestFitTable(guest, table)).map((table) => ({
+                        value: table.id,
+                        label: `${table.name} (${table.seatsLeft} ${labels.seatsLeft})`,
+                      }))}
+                      disabled={isSaving || !tableMetrics.some((table) => canGuestFitTable(guest, table))}
+                      aria-label={`${labels.assignToTable}: ${guest.fullName}`}
+                      onChange={(tableId) => tableId && void runMutation(() => onAssignGuest(guest.id, tableId))}
                     />
                   }
                 />
@@ -321,7 +368,23 @@ const TableCard = ({
   const color = table.seatsLeft < 0 ? 'red' : table.seatsLeft <= 2 ? 'yellow' : 'ishruGreen';
 
   return (
-    <Card className={isSelected ? 'studioCard seatingTable selected' : 'studioCard seatingTable'} withBorder radius="sm" p="md" onClick={onSelect}>
+    <Card
+      className={isSelected ? 'studioCard seatingTable selected' : 'studioCard seatingTable'}
+      withBorder
+      radius="sm"
+      p="md"
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
+      aria-label={`${labels.chooseTable}: ${table.name}`}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+    >
       <Stack gap="xs">
         <Group justify="space-between">
           <Group gap="xs">
@@ -331,7 +394,7 @@ const TableCard = ({
           <Badge color={color} variant="light">{table.seatsLeft} {labels.seatsLeft}</Badge>
         </Group>
         <Text size="sm" c="dimmed">{table.zone}</Text>
-        <Progress value={progress} color={color} radius="xl" />
+        <Progress value={progress} color={color} radius="xl" aria-label={`${table.name}: ${labels.seatsAssigned}`} />
         <Text size="xs" c="dimmed">{table.seatedCount}/{table.capacity} {labels.seatsAssigned}</Text>
       </Stack>
     </Card>
