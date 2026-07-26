@@ -117,7 +117,7 @@ export const AuthPanel = ({ labels, onAuthenticated, sessionExpired = false }: A
   };
 
   return (
-    <Center className="authSurface" mih="100vh" p="md">
+    <Center className="authSurface" component="main" mih="100vh" p="md">
       <Card className="authCard" withBorder radius="sm" p="xl" w="min(100%, 460px)">
         <Stack gap="md">
           <Group justify="space-between">
@@ -138,6 +138,7 @@ export const AuthPanel = ({ labels, onAuthenticated, sessionExpired = false }: A
           )}
 
           <SegmentedControl
+            aria-label={labels.authTitle}
             value={mode}
             onChange={(value) => {
               setMode(value as AuthMode);
@@ -268,7 +269,7 @@ export const ResetPasswordPanel = ({ labels, onAuthenticated, token }: ResetPass
   };
 
   return (
-    <Center className="authSurface" mih="100vh" p="md">
+    <Center className="authSurface" component="main" mih="100vh" p="md">
       <Card className="authCard" withBorder radius="sm" p="xl" w="min(100%, 460px)">
         <Stack gap="md">
           <Box className="authLogoWrap">
