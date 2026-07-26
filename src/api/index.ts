@@ -511,6 +511,12 @@ export const getOwnerOverview = async (): Promise<{ users: OwnerUser[]; events: 
 export const approveAdmin = async (adminId: string): Promise<OwnerUser> =>
   request(`/admin/${adminId}/approve`, { method: 'PATCH' });
 
+export const suspendAdmin = async (adminId: string): Promise<OwnerUser> =>
+  request(`/admin/${adminId}/suspend`, { method: 'PATCH' });
+
+export const restoreAdmin = async (adminId: string): Promise<OwnerUser> =>
+  request(`/admin/${adminId}/restore`, { method: 'PATCH' });
+
 export const getSystemLogs = async (query: SystemLogQuery): Promise<{ items: SystemLogEntry[]; total: number }> => {
   const params = new URLSearchParams();
   Object.entries(query).forEach(([key, value]) => {

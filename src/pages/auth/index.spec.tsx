@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import axe from 'axe-core';
 import { MantineProvider } from '@mantine/core';
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../../components/feedback';
 import { AuthPanel } from '.';
 
@@ -19,26 +19,6 @@ const renderAuthPanel = (sessionExpired = false) => render(
     </FeedbackProvider>
   </MantineProvider>,
 );
-
-beforeAll(() => {
-  vi.stubGlobal('ResizeObserver', class ResizeObserverMock {
-    disconnect() {}
-    observe() {}
-    unobserve() {}
-  });
-  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
-    configurable: true,
-    value: vi.fn(() => null),
-  });
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    value: vi.fn().mockImplementation(() => ({
-      addEventListener: vi.fn(),
-      matches: false,
-      removeEventListener: vi.fn(),
-    })),
-  });
-});
 
 afterEach(() => cleanup());
 

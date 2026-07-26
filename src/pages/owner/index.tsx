@@ -1,7 +1,7 @@
-import { Badge, Button, Card, Group, Stack, Table, Text, Title } from '@mantine/core';
+import { Badge, Button, Card, Group, Modal, Stack, Table, Text, Title } from '@mantine/core';
 import { useEffect, useMemo, useState } from 'react';
-import { IconCheck } from '@tabler/icons-react';
-import { approveAdmin, getOwnerOverview, OwnerEvent, OwnerUser } from '../../api';
+import { IconBan, IconCheck, IconRefresh } from '@tabler/icons-react';
+import { approveAdmin, getOwnerOverview, OwnerEvent, OwnerUser, restoreAdmin, suspendAdmin } from '../../api';
 import { useFeedback } from '../../components/feedback';
 import { uiConfig } from '../../config';
 import { useComponentLogger } from '../../utils/component-logger';
@@ -17,6 +17,7 @@ export const OwnerPanel = ({ labels }: OwnerPanelProps) => {
   const [users, setUsers] = useState<OwnerUser[]>([]);
   const [events, setEvents] = useState<OwnerEvent[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [suspendTarget, setSuspendTarget] = useState<OwnerUser | null>(null);
   const { showFeedback } = useFeedback();
 
   const eventsByHostId = useMemo(() => {
@@ -39,6 +40,36 @@ export const OwnerPanel = ({ labels }: OwnerPanelProps) => {
         title: labels.actionFailed,
         message: getFriendlyErrorMessage(cause, labels),
       });
+    }
+  };
+
+  const updateAccountStatus = async (user: OwnerUser, action: 'restore' | 'suspend') => {
+    setLoadingId(user.id);
+    try {
+      const updatedUser = action === 'suspend' ? await suspendAdmin(user.id) : await restoreAdmin(user.id);
+      setUsers((currentUsers) => currentUsers.map((currentUser) => (
+        currentUser.id === user.id ? { ...currentUser, ...updatedUser } : currentUser
+      )));
+      appLogger.info(
+        `owner.admin.${action}`,
+        action === 'suspend' ? 'Owner suspended admin user' : 'Owner restored admin user',
+        { adminId: user.id, email: updatedUser.email },
+      );
+      showFeedback({
+        type: 'success',
+        title: action === 'suspend' ? labels.adminSuspended : labels.adminRestored,
+        message: action === 'suspend' ? labels.adminSuspendedMessage : labels.adminRestoredMessage,
+      });
+      return true;
+    } catch (cause) {
+      showFeedback({
+        type: 'error',
+        title: labels.actionFailed,
+        message: getFriendlyErrorMessage(cause, labels),
+      });
+      return false;
+    } finally {
+      setLoadingId(null);
     }
   };
 
@@ -70,6 +101,36 @@ export const OwnerPanel = ({ labels }: OwnerPanelProps) => {
 
   return (
     <Stack gap="md">
+      <Modal
+        centered
+        opened={Boolean(suspendTarget)}
+        onClose={() => setSuspendTarget(null)}
+        title={labels.suspendAdminTitle}
+      >
+        <Stack gap="md">
+          <Text>
+            {labels.suspendAdminConfirmation?.replace('{email}', suspendTarget?.email ?? '')}
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setSuspendTarget(null)}>
+              {labels.cancel}
+            </Button>
+            <Button
+              color="red"
+              loading={loadingId === suspendTarget?.id}
+              leftSection={<IconBan size={uiConfig.icons.smallButton} />}
+              onClick={async () => {
+                if (suspendTarget && await updateAccountStatus(suspendTarget, 'suspend')) {
+                  setSuspendTarget(null);
+                }
+              }}
+            >
+              {labels.suspendAdmin}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
       <Stack gap={2}>
         <Title order={2}>{labels.ownerDashboard}</Title>
         <Text size="sm" c="dimmed">{labels.ownerDashboardDescription}</Text>
@@ -95,7 +156,10 @@ export const OwnerPanel = ({ labels }: OwnerPanelProps) => {
                   <Table.Tr key={user.id}>
                     <Table.Td>{user.email}</Table.Td>
                     <Table.Td>
-                      <Badge color={user.accountStatus === 'APPROVED' ? 'ishruGreen' : 'yellow'} variant="light">
+                      <Badge
+                        color={user.accountStatus === 'APPROVED' ? 'ishruGreen' : user.accountStatus === 'SUSPENDED' ? 'red' : 'yellow'}
+                        variant="light"
+                      >
                         {labels[user.accountStatus] ?? user.accountStatus}
                       </Badge>
                     </Table.Td>
@@ -113,6 +177,29 @@ export const OwnerPanel = ({ labels }: OwnerPanelProps) => {
                           onClick={() => approveUser(user.id)}
                         >
                           {labels.approveAdmin}
+                        </Button>
+                      )}
+                      {user.role === 'HOST' && user.accountStatus === 'APPROVED' && (
+                        <Button
+                          color="red"
+                          size="xs"
+                          variant="light"
+                          leftSection={<IconBan size={uiConfig.icons.smallButton} />}
+                          loading={loadingId === user.id}
+                          onClick={() => setSuspendTarget(user)}
+                        >
+                          {labels.suspendAdmin}
+                        </Button>
+                      )}
+                      {user.role === 'HOST' && user.accountStatus === 'SUSPENDED' && (
+                        <Button
+                          size="xs"
+                          variant="light"
+                          leftSection={<IconRefresh size={uiConfig.icons.smallButton} />}
+                          loading={loadingId === user.id}
+                          onClick={() => updateAccountStatus(user, 'restore')}
+                        >
+                          {labels.restoreAdmin}
                         </Button>
                       )}
                     </Table.Td>
